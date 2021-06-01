@@ -1,0 +1,43 @@
+# this is the start of a mariadb image which will have no data but
+# some users and a volume definition for where data will go
+
+FROM debian:buster
+ARG UNIQUEID
+
+#################
+# set up apt and some basic packages we always need, including sshd access
+
+ENV DEBIAN_FRONTEND noninteractive
+COPY wikimedia-apt-key /root/
+COPY standard-apt-setup.sh /root/
+RUN bash /root/standard-apt-setup.sh
+
+###############
+# mariadb-specific setup
+
+# yes the client has 10.3 and the server has 10.4. also, all db import files will be gzipped, so...
+RUN apt-get install -y mariadb-client-10.3 wmf-mariadb104 gzip
+
+# config file for mariadb with unique server_id and gtid_domain
+COPY mariadb/my.cnf /etc/my.cnf
+RUN sed -i "s/FIXME/$UNIQUEID/" /etc/my.cnf
+
+# symlinks from /opt/wmf-mariadb104 to /usr/local/bin and from mysql names to mariadb
+COPY mariadb/scripts/setup-alternatives-links.sh /root/
+RUN /bin/bash /root/setup-alternatives-links.sh
+
+# set up the mysql user
+RUN /usr/sbin/groupadd mysql && /usr/sbin/useradd -g mysql mysql
+
+# install system and other dbs normally done at initialization in the systemd unit
+RUN mkdir -p /srv/tmp /srv/sqldata /run/mysqld  && chown mysql:mysql /srv/tmp /srv/sqldata /run/mysqld
+RUN /opt/wmf-mariadb104/scripts/mysql_install_db -u mysql --datadir=/srv/sqldata --auth-root-authentication-method=normal
+
+# start up the server, secure it somewhat, set up root password, shut it down again
+COPY mariadb/scripts/setup_server.sh /root/
+RUN /bin/bash /root/setup_server.sh notverysecure
+
+# ports for sshd, mariadb
+EXPOSE 22 3306
+
+CMD /opt/wmf-mariadb104/bin/mysqld --basedir=/opt/wmf-mariadb104/ ; /usr/sbin/sshd -D

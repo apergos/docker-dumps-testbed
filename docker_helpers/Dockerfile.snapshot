@@ -1,0 +1,23 @@
+# this is a SAMPLE, it doesn't do ANYTHING. it's just so we can test the api of the python script
+
+FROM debian:buster
+
+#################
+# set up apt and some basic packages we always need, including sshd access
+
+ENV DEBIAN_FRONTEND noninteractive
+COPY wikimedia-apt-key /root/
+COPY standard-apt-setup.sh /root/
+RUN bash /root/standard-apt-setup.sh
+
+# dumps needs these
+#RUN apt-get install -y bzip2 lbzip2 mwbzutils gzip p7zip-full default-mysql-client curl python3-yaml
+
+# mediawiki needs these
+#RUN apt-get install -y php php-apcu php-luasandbox php-msgpack php-wikidiff2 php-wmerrors
+#RUN apt-get install -y php7.2-bcmath php7.2-bz2 php7.2-cli php7.2-common php7.2-curl php7.2-dba php7.2-fpm php7.2-gd php7.2-gmp
+#RUN apt-get install -y php7.2-intl php7.2-json php7.2-mbstring php7.2-mysql php7.2-opcache php7.2-readline php7.2-xml
+
+EXPOSE 22
+
+CMD /usr/sbin/sshd -D
