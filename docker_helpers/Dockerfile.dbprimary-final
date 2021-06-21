@@ -1,0 +1,15 @@
+# this is the start of a mariadb image which will have no data but
+# some users and a volume definition for where data will go
+
+FROM wikimedia-dumps/dbprimary-base:latest
+ARG SETNAME
+
+# we want the file with all the container names for the set; these will
+# be embedded in various files in the image
+COPY ["mariadb/substitution.conf", "do_container_subs.py", "container_list.$SETNAME", "/root/"]
+RUN python3 /root/do_container_subs.py "$SETNAME"
+
+# ports for sshd, mariadb
+EXPOSE 22 3306
+
+CMD /usr/sbin/sshd && /opt/wmf-mariadb104/bin/mysqld --basedir=/opt/wmf-mariadb104/

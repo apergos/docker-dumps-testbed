@@ -1,0 +1,7 @@
+export LANG=C
+export APACHE_RUN_USER=www-data
+export APACHE_RUN_GROUP=www-data
+export APACHE_PID_FILE=/run/apache2/httpd.pid
+export APACHE_RUN_DIR=/run/apache2
+export APACHE_LOG_DIR=/var/log/apache2
+export APACHE_LOCK_DIR=/var/lock/apache2

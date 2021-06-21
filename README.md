@@ -26,3 +26,16 @@ which is now available at https://github.com/apergos/dockerhosts
 It's a pretty clean approach which doesn't involve overwriting resolv.conf or adding
 things to /etc/hosts, which is why I chose this instead of DPS. But it likely only works on
 *nix hosts.
+
+Setup notes:
+
+If you spend a lot of time poking about via bash or ssh in your containers, you'll likely
+want to set up or add to the docker cli config, usually stored in $HOME/.docker/config.json
+so that Ctrl-p works properly for searching back through command history. A sample file
+is in config.json.sample.
+
+I like to have as few extra junk images and containers around as possible after a build.
+To this end, I use the "squash" argument to docker image builds. To enable that, you
+must add an entry enabling experimental features to /etc/docker/daemon.json or create
+the file if it does not exist already. A sample file is in daemon.json.sample. YOu can
+then set squash: true in your config file.

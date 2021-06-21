@@ -1,0 +1,18 @@
+# apache with fcgi enabled, intended to answer to requests for
+# mediawiki-related stuff, so, wiki pages, mediawiki api requests
+# and so on -- FINAL IMAGE with container names embedded
+
+FROM wikimedia-dumps/httpd-base:latest
+ARG SETNAME
+
+# we want the file with all the container names for the set; these will
+# be embedded in various files in the image
+COPY ["httpd/substitution.conf", "do_container_subs.py", "container_list.$SETNAME", "/root/"]
+RUN python3 /root/do_container_subs.py "$SETNAME"
+
+ENV APACHE_RUN_USER=www-data APACHE_PID_FILE=/run/apache2/httpd.pid APACHE_RUN_DIR=/run/apache2 \
+    APACHE_RUN_GROUP=www-data LANG=C APACHE_LOG_DIR=/var/log/apache2 \
+    APACHE_LOCK_DIR=/var/lock/apache2
+
+EXPOSE 22 80
+CMD /usr/sbin/sshd && /usr/sbin/apache2 -d /etc/apache2 -DFOREGROUND

@@ -1,0 +1,13 @@
+# base image for all dumps testbed images
+
+FROM debian:buster
+
+#################
+# set up apt and some basic packages we always need, including sshd access
+
+ENV DEBIAN_FRONTEND noninteractive
+COPY ["wikimedia-apt-key", "standard-apt-setup.sh", "/root/"]
+RUN bash /root/standard-apt-setup.sh
+
+EXPOSE 22
+CMD /usr/sbin/sshd -D

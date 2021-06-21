@@ -1,0 +1,12 @@
+# this is a SAMPLE, it doesn't do ANYTHING. it's just so we can test the api of the python script
+
+FROM wikimedia-dumps/snapshot-base:latest
+ARG SETNAME
+
+# we want the file with all the container names for the set; these will
+# be embedded in various files in the image
+COPY ["snapshot/substitution.conf", "do_container_subs.py", "container_list.$SETNAME", "/root/"]
+RUN python3 root/do_container_subs.py "$SETNAME"
+
+EXPOSE 22
+CMD /usr/sbin/sshd -D

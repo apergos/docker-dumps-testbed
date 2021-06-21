@@ -1,0 +1,4 @@
+*~
+*.pyc
+container_list.*
+**/temp/

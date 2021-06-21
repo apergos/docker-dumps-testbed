@@ -1,0 +1,16 @@
+# php-fpm final image with set info
+
+FROM wikimedia-dumps/phpfpm-base:latest
+ARG SETNAME
+
+# we want the file with all the container names for the set; these will
+# be embedded in various files in the image
+COPY ["phpfpm/substitution.conf", "do_container_subs.py", "container_list.$SETNAME", "/root/"]
+RUN python3 /root/do_container_subs.py "$SETNAME"
+
+# ports for sshd, phpfpm
+EXPOSE 22 9000
+
+# fixme add phpfpm crapola later
+CMD /usr/sbin/sshd -D
+
