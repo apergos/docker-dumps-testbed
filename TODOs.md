@@ -182,9 +182,9 @@ time the container from a final image starts up...
 
 Not so much. This is a testbed. Run it on a laptop or desktop not exposed to the world.
 
-* At some point we should replace the hardcoded mysql root password with something configurable.
+* At some point we should replace the hardcoded mysql root password with something configurable. -- DONE
 * At some point we should replace the hardcoded root password for ssh with a user-generated ssh key.
-* At some point we should generate random passwords for the wikifarm users that access wiki databases.
+* At some point we should generate random passwords for the wikifarm users that access wiki databases or make them configurable. -- DONE
 * It might be nice to restrict which instances can send requests to the php-fpm instance.
 * We don't drop any capabilities for these containers. Maybe we should.
 * Probably lots of other stuff.
@@ -193,26 +193,22 @@ Not so much. This is a testbed. Run it on a laptop or desktop not exposed to the
 
 * We can spin up and destroy images and containers on a particular network from a config.
 * The snapshot instance doesn't actually contain the dump repo or the mediawiki one.
-* The dbprimary instance has no data beyond the system tables.
+* The dbprimary instance can import data for wikis and set up users for them. But it's not been tested with MW.
 * The httpd (mediawiki web server) instance has a web server that serves a single static html page.
 * The php-fpm instance installs many nice php bits but doesn't configure or run php-fpm, or have a mount point for the wikifarm mediawiki repos.
 * The other images do not exist.
 
 ### Current work next steps 
 
-* Get a php-fpm instance that serves only one file (index.php which just prints hello, let's say) working with the mw web server
-* Get a dbprimary instance set up with elwikivoyage test data imported.
-* Add appropriate users and grants to the mariadb primary instance for mediawiki access to elwikivoyage via wikifarm.
+* Get a php-fpm instance that serves only one file (phpfpm_test.php which just prints hello, let's say) working with the mw web server
 * Add wikifarm volume to php-fpm instance. This should include the various configs initially; the goal is just to get it to work.
 * Add wikifarm volume and dumps repo volume to snapshot instance. This should include the various configs initially.
 * Clean up and finalization of locations of things, etc.
 
 ### Next steps for the dbprimary instance 
 
-* COPY in some smallish sql.gz files and import them via script, then verify that the resulting image provides a usable not too huge container. SAVE THAT IMAGE (1)
-* Add users and grants via script and check that the resulting container looks right. SAVE THAT IMAGE (2)
-* Add a user for replication and save that image (3)
-* See if a second container from (2) can be converted manually to use replication against (3). What's required? Can it be automated?
+* Add a user for replication and save that image (A)
+* See if a second container from the current final image can be converted manually to use replication against (A). What's required? Can it be automated?
 
 Note that this first version will have one wiki only, use compression for content blobs which will
 continue to live right in the text (?) table of the same wiki db, no external store.
@@ -223,4 +219,4 @@ Already done:
 * the test db is gone
 * the local root user has a (crap) password, anon user is gone, remote root user is gone
 * /etc/my.cnf has been modified from the production one to values more suitable for a tiny container on a laptop.
-
+* import data for a wiki with setup of the wiki's db users too
