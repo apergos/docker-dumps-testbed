@@ -8,7 +8,7 @@ RUN apt-get install -y apache2 libapache2-mod-security2 && \
     mkdir -p /run/apache2 /var/lock/apache2 /var/log/apache2 && chown www-data:www-data /run/apache2 /var/lock/apache2 /var/log/apache2
 
 COPY "httpd/" "/root/"
-RUN bash /root/setup-webserver.sh
+RUN /usr/bin/python3 /root/setup_image.py --stage base --type httpd
 
 ENV APACHE_RUN_USER=www-data APACHE_PID_FILE=/run/apache2/httpd.pid APACHE_RUN_DIR=/run/apache2 \
     APACHE_RUN_GROUP=www-data LANG=C APACHE_LOG_DIR=/var/log/apache2 \

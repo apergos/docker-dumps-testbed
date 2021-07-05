@@ -25,7 +25,8 @@ echo "deb http://apt.wikimedia.org/wikimedia buster-wikimedia main component/php
 echo "deb-src http://apt.wikimedia.org/wikimedia buster-wikimedia main component/php72 thirdparty/hwraid" >> /etc/apt/sources.list
 
 apt-get update -y && apt-get upgrade -y && apt-get install -y apt-utils
-apt-get install -y python3-software-properties bash-completion
+# yaml and mysqldb are required for the base/final image setup script
+apt-get install -y python3-software-properties bash-completion python3-yaml python3-mysqldb
 
 # ssh access into container, allow login as root with password
 apt-get install -y openssh-server && mkdir -p /var/run/sshd  && echo 'root:testing' |chpasswd

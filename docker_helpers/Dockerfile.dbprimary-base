@@ -2,26 +2,24 @@
 # some users and a volume definition for where data will go
 
 From wikimedia-dumps/base:latest
-ARG UNIQUEID
 
 # yes the client has 10.3 and the server has 10.4. also, all db import files will be gzipped, so...
 RUN apt-get install -y mariadb-client-10.3 wmf-mariadb104 gzip
 
 COPY mariadb/my.cnf /etc/my.cnf
-COPY ["mariadb/scripts/setup-alternatives-links.sh", "mariadb/scripts/setup_server.sh", "/root/"]
+COPY ["mariadb/scripts/setup-alternatives-links.sh", "/root/"]
 
 # in order we do the following:
-#  - make config file for mariadb have unique server_id and gtid_domain
 #  - make symlinks from /opt/wmf-mariadb104 to /usr/local/bin and from mysql names to mariadb
 #  - set up the mysql user
 #  - install system and other dbs normally done at initialization in the systemd unit
-#  - start up the server, secure it somewhat, set up root password, shut it down again
-RUN sed -i "s/FIXME/$UNIQUEID/" /etc/my.cnf && \
-    /bin/bash /root/setup-alternatives-links.sh && \
+#  - start up the server, secure it somewhat, set up root password, shut it down again (this last is in
+#    setup_image.py)
+RUN /bin/bash /root/setup-alternatives-links.sh && \
     /usr/sbin/groupadd mysql && /usr/sbin/useradd -g mysql mysql && \
     mkdir -p /srv/tmp /srv/sqldata /run/mysqld  && chown mysql:mysql /srv/tmp /srv/sqldata /run/mysqld && \
     /opt/wmf-mariadb104/scripts/mysql_install_db -u mysql --datadir=/srv/sqldata --auth-root-authentication-method=normal && \
-    /bin/bash /root/setup_server.sh notverysecure
+    /usr/bin/python3 /root/setup_image.py --stage base --type dbprimary
 
 # ports for sshd, mariadb
 EXPOSE 22 3306

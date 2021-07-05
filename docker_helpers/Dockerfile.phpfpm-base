@@ -8,5 +8,7 @@ RUN apt-get install -y php php-apcu php-luasandbox php-msgpack php-wikidiff2 php
 	php7.2-readline php7.2-xml php7.2-bz2 php7.2-curl php7.2-dba php7.2-fpm php7.2-gd php7.2-gmp php-wmerrors \
         bzip2 lbzip2 gzip p7zip-full default-mysql-client curl python3-yaml
 
+RUN /usr/bin/python3 /root/setup_image.py --stage base --type phpfpm
+
 EXPOSE 22
 CMD /usr/sbin/sshd -D

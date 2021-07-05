@@ -2,3 +2,5 @@
 *.pyc
 container_list.*
 **/temp/
+credentials*yaml
+*.sql.gz

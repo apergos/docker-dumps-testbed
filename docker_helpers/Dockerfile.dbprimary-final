@@ -6,8 +6,12 @@ ARG SETNAME
 
 # we want the file with all the container names for the set; these will
 # be embedded in various files in the image
-COPY ["mariadb/substitution.conf", "do_container_subs.py", "container_list.$SETNAME", "/root/"]
-RUN python3 /root/do_container_subs.py "$SETNAME"
+COPY ["mariadb/substitution.conf", "container_list.$SETNAME", "credentials.$SETNAME.yaml", "/root/"]
+RUN mkdir -p /root/imports
+
+# import all the wikis!
+COPY ["mariadb/imports/$SETNAME", "/root/imports"]
+RUN python3 /root/setup_image.py --stage final --type dbprimary --set "$SETNAME"
 
 # ports for sshd, mariadb
 EXPOSE 22 3306

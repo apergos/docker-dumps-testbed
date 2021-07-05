@@ -7,8 +7,8 @@ ARG SETNAME
 
 # we want the file with all the container names for the set; these will
 # be embedded in various files in the image
-COPY ["httpd/substitution.conf", "do_container_subs.py", "container_list.$SETNAME", "/root/"]
-RUN python3 /root/do_container_subs.py "$SETNAME"
+COPY ["httpd/substitution.conf", "container_list.$SETNAME", "credentials.$SETNAME.yaml", "/root/"]
+RUN python3 /root/setup_image.py --stage final --type httpd --set "$SETNAME"
 
 ENV APACHE_RUN_USER=www-data APACHE_PID_FILE=/run/apache2/httpd.pid APACHE_RUN_DIR=/run/apache2 \
     APACHE_RUN_GROUP=www-data LANG=C APACHE_LOG_DIR=/var/log/apache2 \

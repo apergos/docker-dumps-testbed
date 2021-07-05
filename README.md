@@ -39,3 +39,11 @@ To this end, I use the "squash" argument to docker image builds. To enable that,
 must add an entry enabling experimental features to /etc/docker/daemon.json or create
 the file if it does not exist already. A sample file is in daemon.json.sample. YOu can
 then set squash: true in your config file.
+
+Test suite:
+
+The test suite only tests a couple small things. If you want to run the mysqldb server test,
+you must set up a configuration file "testbed.config" in the current working directory, or
+be sure that the executables mysql_install_db and mysqld are in one of /usr/bin,
+/usr/local/bin or /usr/libexec. You'll also need to install python(3)-mysqldb, which is used
+for mysql/mariadb connections from within the test suite.

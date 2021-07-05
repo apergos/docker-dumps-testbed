@@ -132,7 +132,7 @@ class Networks():
                 if self.labeler.has_labels(entry.attrs['Labels'], labels):
                     if self.verbose:
                         print("Removing network")
-                        entry.remove()
+                    entry.remove()
         else:
             for entry in networks:
                 if ((network and entry.name == network) or
@@ -141,7 +141,7 @@ class Networks():
                                                 self.labeler.get_set_label())):
                     if self.verbose:
                         print("Removing network")
-                        entry.remove()
+                    entry.remove()
 
 
 class ContainerConfig():
@@ -149,6 +149,30 @@ class ContainerConfig():
     def __init__(self, configpath, verbose):
         self.verbose = verbose
         self.config = self.get_config(configpath)
+
+    @staticmethod
+    def merge_in_defaults(values, defaults, key):
+        '''
+        given a dictionary which may or may not hav the specified key in it,
+        which may be empty or have a string or another dict, merge in the entry
+        for the defaults dict with that key, which also may be nested dicts, and
+        return the result.
+        '''
+        merged = {}
+
+        if key not in values or not values[key]:
+            return defaults[key]
+
+        try:
+            _unused = defaults[key].items()
+        except AttributeError:
+            # we're at the bottom turtle.
+            return defaults[key]
+
+        for subkey in defaults[key]:
+            merged[subkey] = ContainerConfig.merge_in_defaults(values[key], defaults[key], subkey)
+
+        return merged
 
     def get_config(self, configfilepath):
         '''
@@ -165,11 +189,20 @@ class ContainerConfig():
             except (FileNotFoundError, PermissionError):
                 pass
 
+        configfilepath = os.path.join(os.getcwd(), 'default.conf')
+        with open(configfilepath, "r") as fhandle:
+            contents = fhandle.read()
+            defaults = yaml.safe_load(contents)
+
         if not values:
-            configfilepath = os.path.join(os.getcwd(), 'default.conf')
-            with open(configfilepath, "r") as fhandle:
-                contents = fhandle.read()
-                values = yaml.safe_load(contents)
+            values = defaults
+
+        if 'sets' not in values or not values['sets']:
+            values['sets'] = defaults['sets']
+
+        for setname in values['sets']:
+            values['sets'][setname]['passwords'] = self.merge_in_defaults(
+                values['sets'][setname], defaults['global'], 'passwords')
 
         if self.verbose:
             print("configuration:", values)
@@ -208,7 +241,7 @@ class ContainerConfig():
 
         if config['snapshots']:
             containers.extend(
-                [set_name + "-snapshot-{:02d}.{net}.lan".format(i + 1, net=net_name)
+                [set_name + "-snapshot-{:02d}.{net}".format(i + 1, net=net_name)
                  for i in range(config['snapshots'])])
         containers.append(set_name + "-dbprimary.{net}".format(net=net_name))
         if config['dbreplicas']:
@@ -237,6 +270,42 @@ class ContainerConfig():
         this does not mean that any containers or images in these sets exist.
         '''
         print("Known sets:", ', '.join(list(self.config['sets'].keys())))
+
+    def write_creds_file(self, setname, path):
+        '''
+        write a yaml file to the specified output path consisting of
+        various credentials for users on the containers in the set
+        as well as the list of dbs on which the db creds will be good
+
+        we know that the default password settings have already been
+        marged into the set configs in the constructor, so we don't have
+        to worry about that.
+
+        if there is no such set we silently return. hrm.
+        '''
+        set_config = self.get_containerset_config(setname)
+        if not set_config:
+            return
+
+        contents = []
+        root_password = set_config['passwords']['containers']['root']
+        contents.append("rootuser: " + root_password)
+
+        rootdbuser_password = set_config['passwords']['dbs']['root']
+        contents.append("rootdbuser: " + rootdbuser_password)
+
+        wikidbuser_password = set_config['passwords']['dbs']['wikidb_user']
+        contents.append("wikidbuser: " + wikidbuser_password)
+
+        wikidbadmin_password = set_config['passwords']['dbs']['wikidb_admin']
+        contents.append("wikidbadmin: " + wikidbadmin_password)
+
+        contents.append("wikis:")
+        for wiki in set_config['wikidbs']:
+            contents.append("  - " + wiki)
+
+        with open(path, "w") as creds:
+            creds.write("\n".join(contents) + "\n")
 
 
 class Images():
@@ -276,7 +345,7 @@ class Images():
             if self.verbose:
                 print("building base image for all images in " + self.args['set'])
             try:
-                client.images.build(
+                _unused, logs = client.images.build(
                     path=path,
                     rm=True,
                     forcerm=True,
@@ -289,6 +358,11 @@ class Images():
                 for line in error.build_log:
                     print(line)
                 raise
+            if self.verbose:
+                print("BUILD SUCCEEDED for common base image in {setname}".format(
+                    setname=self.args['set']))
+                for entry in logs:
+                    print(entry)
 
     def do_base_build(self):
         '''
@@ -320,21 +394,26 @@ class Images():
                     if self.verbose:
                         print("building {name} base image for".format(name=base_image),
                               self.args['set'])
-                        try:
-                            client.images.build(
-                                path=path,
-                                rm=True,
-                                forcerm=True,
-                                dockerfile=dockerfile,
-                                tag=base_image,
-                                squash=do_squash,
-                                labels=self.labeler.get_blame_label())
-                        except docker.errors.BuildError as error:
-                            print("BUILD FAILED for {name} base image in {setname}".format(
-                                name=image_name, setname=self.args['set']))
-                            for line in error.build_log:
-                                print(line)
-                            raise
+                    try:
+                        _unused, logs = client.images.build(
+                            path=path,
+                            rm=True,
+                            forcerm=True,
+                            dockerfile=dockerfile,
+                            tag=base_image,
+                            squash=do_squash,
+                            labels=self.labeler.get_blame_label())
+                    except docker.errors.BuildError as error:
+                        print("BUILD FAILED for {name} base image in {setname}".format(
+                            name=image_name, setname=self.args['set']))
+                        for line in error.build_log:
+                            print(line)
+                        raise
+                    if self.verbose:
+                        print("BUILD SUCCEEDED for {name} base image in {setname}".format(
+                            name=image_name, setname=self.args['set']))
+                        for entry in logs:
+                            print(entry)
 
     def do_final_build(self):
         '''
@@ -344,6 +423,11 @@ class Images():
         if all of the images exist and are current, return
         '''
         self.do_base_build()
+
+        # this will get copied into these final images and has creds from per-set config
+        credsfile_path = os.path.join(
+            os.getcwd(), 'docker_helpers', 'credentials.' + self.args['set'] + ".yaml")
+        self.config.write_creds_file(self.args['set'], credsfile_path)
 
         client = DockerClient(base_url='unix://var/run/docker.sock')
 
@@ -374,22 +458,27 @@ class Images():
                     if self.verbose:
                         print("building {name} final image for".format(name=final_image),
                               self.args['set'])
-                        try:
-                            client.images.build(
-                                path=path,
-                                rm=True,
-                                forcerm=True,
-                                dockerfile=dockerfile,
-                                tag=final_image,
-                                labels=self.labeler.get_blame_label(),
-                                squash=do_squash,
-                                buildargs={'SETNAME': self.args['set']})
-                        except docker.errors.BuildError as error:
-                            print("BUILD FAILED for {name} final image in {setname}".format(
-                                name=image_name, setname=self.args['set']))
-                            for line in error.build_log:
-                                print(line)
-                            raise
+                    try:
+                        _unused, logs = client.images.build(
+                            path=path,
+                            rm=True,
+                            forcerm=True,
+                            dockerfile=dockerfile,
+                            tag=final_image,
+                            labels=self.labeler.get_blame_label(),
+                            squash=do_squash,
+                            buildargs={'SETNAME': self.args['set']})
+                    except docker.errors.BuildError as error:
+                        print("BUILD FAILED for {name} final image in {setname}".format(
+                            name=image_name, setname=self.args['set']))
+                        for line in error.build_log:
+                            print(line)
+                        raise
+                    if self.verbose:
+                        print("BUILD SUCCEEDED for {name} final image in {setname}".format(
+                            name=image_name, setname=self.args['set']))
+                        for entry in logs:
+                            print(entry)
 
     def do_purge(self):
         '''

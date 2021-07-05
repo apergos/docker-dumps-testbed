@@ -6,7 +6,7 @@ FROM debian:buster
 # set up apt and some basic packages we always need, including sshd access
 
 ENV DEBIAN_FRONTEND noninteractive
-COPY ["wikimedia-apt-key", "standard-apt-setup.sh", "/root/"]
+COPY ["wikimedia-apt-key", "standard-apt-setup.sh", "setup_image.py", "/root/"]
 RUN bash /root/standard-apt-setup.sh
 
 EXPOSE 22
