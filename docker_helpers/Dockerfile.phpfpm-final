@@ -8,9 +8,13 @@ ARG SETNAME
 COPY ["phpfpm/substitution.conf", "container_list.$SETNAME", "credentials.$SETNAME.yaml", "/root/"]
 RUN python3 /root/setup_image.py --stage final --type phpfpm --set "$SETNAME"
 
+RUN mkdir -p "/etc/motd.d/"
+RUN echo -e "\nThis is a PHP-FPM instance.\n" > /etc/motd.d/containerinfo
+
+RUN mkdir -p "/srv/mediawiki/wikifarm"
+VOLUME /srv/mediawiki/wikifarm
+
 # ports for sshd, phpfpm
 EXPOSE 22 9000
-
-# fixme add phpfpm crapola later
-CMD /usr/sbin/sshd -D
+CMD /usr/sbin/sshd && /usr/sbin/php-fpm7.2 --nodaemonize --fpm-config /etc/php/7.2/fpm/php-fpm.conf
 

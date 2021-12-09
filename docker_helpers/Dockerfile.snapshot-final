@@ -8,5 +8,8 @@ ARG SETNAME
 COPY ["snapshot/substitution.conf", "container_list.$SETNAME", "credentials.$SETNAME.yaml", "/root/"]
 RUN python3 /root/setup_image.py --stage final --type snapshot --set "$SETNAME"
 
+RUN mkdir -p "/etc/motd.d/"
+RUN echo -e "\nThis is an SQL/XML dumps snapshot instance.\n" > /etc/motd.d/containerinfo
+
 EXPOSE 22
 CMD /usr/sbin/sshd -D

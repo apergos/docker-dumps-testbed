@@ -1,36 +1,52 @@
 <!DOCTYPE html>
 <html lang=en>
-<meta charset="utf-8">
-<title>SQL/XML Dumps testbed</title>
-<style>
-* { margin: 0; padding: 0; }
-body { background: #fff; margin: 7% auto 0; padding: 2em 1em 1em; font: 15px/1.6 sans-serif; color: #333; max-width: 640px; }
-img { float: left; margin: 0 2em 2em 0; }
-a img { border: 0; }
-h1 { margin-top: 1em; font-size: 1.2em; }
-p { margin: 0.7em 0 1em 0; }
-a { color: #0645AD; text-decoration: none; }
-a:hover { text-decoration: underline; }
-</style>
-<h1>Welcome to the SQL/XML Dumps testbed</h1>
-<p>
-  You have reached the main page of the SQL/XML Dumps testbed. This server is a mediawiki app/api container running apache.
-  It doesn't have a copy of mediawiki itself, but rather communicates with a php-fpm instance that processes all requests
-  except those for static content.
-</p>
-<p>
-  While this container listens on port 80, and should be available from the laptop or desktop running these containers,
-  a separate web server may also be running and serving dump output files on 8080, if you have so configured the testbed.
-</p>
-<p>
-  You should be able to ssh into any container from your laptop or desktop, giving the fqdn of the container. The root
-  password is "testing" and we plan to fix that up in a future release.
-</p>
-<p>
-  See the document (TBD) describing the various containers and what they do, or just
-  <code>docker ls</code> when they are running; the names should be pretty self-explanatory.
-</p>
-<p>
-  Bug reports to (TBD). Enjoy!
-</p>
+  <meta charset="utf-8">
+  <title>SQL/XML Dumps testbed</title>
+  <style>
+    * { margin: 0; padding: 0; }
+    body { background: #fff; margin: 7% auto 0; padding: 2em 1em 1em; font: 15px/1.6 sans-serif; color: #333; max-width: 640px; }
+    img { float: left; margin: 0 2em 2em 0; }
+    a img { border: 0; }
+    h1 { margin-top: 1em; font-size: 1.2em; }
+    h2 { font-size: 1em; }
+    p { margin: 0.7em 0 1em 0; }
+    a { color: #0645AD; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+  </style>
+  <body>
+    <h1>Welcome to the SQL/XML Dumps testbed</h1>
+    <h2>BIG FAT WARNING</h2>
+    <p>
+      This is pre-alpha software. Expect bugs, sudden refactoring, and the possiblity that it will cause your laptop
+      to catch fire. In other words, try it out at your own risk!
+    </p>
+    <h2>What is this?</h2>
+    <p>
+      You have reached the main page of the SQL/XML Dumps testbed. This server is a mediawiki app/api container running apache.
+      It communicates with a php-fpm instance that processes all requests except those for static content.
+    </p>
+    <p>
+      While this container listens on port 80, and should be available from the laptop or desktop running these containers,
+      a separate web server may also be running and serving dump output files on 8080, if you have so configured the testbed.
+    </p>
+    <p>
+      You should be able to ssh into any container from your laptop or desktop, giving the fqdn of the container. The root
+      password is "testing", and we plan to make that configurable in a future release.
+    </p>
+    <p>
+      See the document <a href="/containers.html">Testbed Containers</a> describing the various containers and what they do, or just
+      <code>docker ls</code> when they are running; the names should be pretty self-explanatory.
+    </p>
+    <p>
+      To check that the php-fpm container(s) are running properly, you may visit <a href="/hello.php"></a>.
+    </p>
+    <p>
+      This testbed uses the PHP Opcache. If you make live changes to the version of MediaWiki being run in these
+      containers, you'll need to invalidate the opcache without causing the container to exit. You can
+      do that by visiting the <a href="/invalidate-cache.php">Opcache invalidation</a> page.
+    </p>
+    <p>
+      Please send bug reports, comments and suggestions to ops-dumps@wikimedia.org. Enjoy!
+    </p>
+  </body>
 </html>

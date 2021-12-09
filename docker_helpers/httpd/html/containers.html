@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang=en>
+  <meta charset="utf-8">
+  <title>SQL/XML Dumps testbed</title>
+  <style>
+    * { margin: 0; padding: 0; }
+    body { background: #fff; margin: 7% auto 0; padding: 2em 1em 1em; font: 15px/1.6 sans-serif; color: #333; max-width: 640px; }
+    img { float: left; margin: 0 2em 2em 0; }
+    a img { border: 0; }
+    h1 { margin-top: 1em; font-size: 1.2em; }
+    h2 { font-size: 1em; }
+    p { margin: 0.7em 0 1em 0; }
+    dt { font-weight: bold; }
+    dd { margin: 1em }
+    a { color: #0645AD; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+  </style>
+  <body>
+    <h1>SQL/XML Dumps Testbed Containers</h1>
+    <p>
+      This testbed consists of a number of Docker containers, all in the same Docker network so that they can communicate
+      seamlessly with each other.
+    </p>
+    <p>
+      <dt>&lt;networkname&gt;-httpd</dt>
+      <dd>
+	This is an app server instance that serves MediaWiki. You can look at the pages of the wikis that have been set up
+	for testing, by browsing to this instance from the host computer running the testbed. URLs should be of the form
+	http://&lt;networkname&gt;-httpd.&lt;networkname&gt;.lan/&lt;wikiname&gt;/mw/index.php?title=SomeTitleHere but that
+	will depend in part on the directory tree you have set up with MediaWiki versions for each test wiki.
+      </dd>
+      <dt>&lt;networkname&gt;-phpfpm</dt>
+      <dd>
+	This is a php-fpm instance to which all web requests for php scripts are sent. You should never have to interact with
+	it directly.
+      </dd>
+      <dt>&lt;networkname&gt;-dbprimary</dt>
+      <dd>
+	This is the primary database server instance. It should contain one database with all of the releveant tables, per
+	test wiki. You can query the database from the host computer running the testbed, using any mysql-compatible
+	client, connecting as the root user with the password that you have configured. You can also connect to it from any
+	instance in the testbed, using the same credentials.
+      </dd>
+      <dt>&lt;networkname&gt;-dbreplica-NN (SOON)</dt>
+      <dd>
+	These are database replica server instances. You do not need these to run the testbed, but you may wish to check that,
+	for example, during a dumps run, no write requests are sent to the primary server, and it can be handy having one or
+	more replicas where all read requests would go. Likewise, you can set up your MediaWiki configuration to use
+	multiple replicas with requests for certain wikis going only to certain instances, and verify in your particular
+	set of tests that this works as expected.
+      </dd>
+      <dt>&lt;networkname&gt;-dbextstore (SOON)</dt>
+      <dd>
+	If this is configured, all wikitext is stored here instead of directly in the dbprimary and/or dbreplica instances.    
+	This is not required in order to run the testbed, but the Wikimedia production cluster uses such an external store,
+	so you may wish to do the same, if you are concerned with having a setup that is as close to production as
+	possible.
+      </dd>
+      <dt>&lt;networkname&gt;-dumpsdata (SOON)</dt>
+      <dd>
+	If this is configured, dumps output files are written to this instance from the snapshot instances, via an NFS
+	share. This is not required in order to run the testbed, but you may wish to test out locking and other things
+	that can be tricky on NFS. The Wikimedia production cluster has such NFS servers and so any dumps code must
+	function in such a setup.
+      </dd>
+      <dt>&lt;networkname&gt;-snapshot-NN</dt>
+      <dd>
+	These are snapshot instances, the instances on which you may launch the dump generation script. You may configure
+	only one instance if you wish, but this means that you will not be able to run tests involving parallel generation
+	of dumps content for the same wiki across multiple hosts. You will, however, be able to configure all other dump
+	tests.
+      </dd>
+    </p>
+    <hr>
+    <p>
+      Back to the <a href="index.html">main page</a>
+    </p>
+  </body>
+</html>

@@ -14,5 +14,11 @@ ENV APACHE_RUN_USER=www-data APACHE_PID_FILE=/run/apache2/httpd.pid APACHE_RUN_D
     APACHE_RUN_GROUP=www-data LANG=C APACHE_LOG_DIR=/var/log/apache2 \
     APACHE_LOCK_DIR=/var/lock/apache2
 
+RUN mkdir -p "/etc/motd.d/"
+RUN echo -e "\nThis is a MediaWiki appserver instance.\n" > /etc/motd.d/containerinfo
+
+RUN mkdir -p "/srv/mediawiki/wikifarm"
+VOLUME /srv/mediawiki/wikifarm
+
 EXPOSE 22 80
 CMD /usr/sbin/sshd && /usr/sbin/apache2 -d /etc/apache2 -DFOREGROUND

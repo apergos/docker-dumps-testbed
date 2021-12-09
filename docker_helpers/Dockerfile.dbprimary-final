@@ -13,6 +13,9 @@ RUN mkdir -p /root/imports
 COPY ["mariadb/imports/$SETNAME", "/root/imports"]
 RUN python3 /root/setup_image.py --stage final --type dbprimary --set "$SETNAME"
 
+RUN mkdir -p "/etc/motd.d/"
+RUN echo -e "\nThis is a mariadb primary server instance.\n" > /etc/motd.d/containerinfo
+
 # ports for sshd, mariadb
 EXPOSE 22 3306
 

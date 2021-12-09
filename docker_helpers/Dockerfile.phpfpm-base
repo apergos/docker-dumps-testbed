@@ -2,11 +2,24 @@
 
 FROM wikimedia-dumps/base:latest
 
+# NOTE: we omit the following packages, used in production: php-geoip, php-memcached, php-redis
+
+# We do include imagemagick for MediaWiki scaling of images
+
 # mediawiki needs the first three lines, and the rest will be handy if ew need to poke around on the instance
 RUN apt-get install -y php php-apcu php-luasandbox php-msgpack php-wikidiff2 php7.2-bcmath php7.2-cli php7.2-common \
         php7.2-dba php7.2-fpm php7.2-gd php7.2-gmp php7.2-intl php7.2-json php7.2-mbstring php7.2-mysql php7.2-opcache \
 	php7.2-readline php7.2-xml php7.2-bz2 php7.2-curl php7.2-dba php7.2-fpm php7.2-gd php7.2-gmp php-wmerrors \
-        bzip2 lbzip2 gzip p7zip-full default-mysql-client curl python3-yaml
+        php-igbinary php-excimer bzip2 lbzip2 gzip p7zip-full default-mysql-client curl python3-yaml imagemagick && \
+        rm -rf /etc/php/7.2/fpm/pool.d/* && \
+        install -d -o www-data -g www-data -m 0750 /run/shared && \
+        sed -i"" s/compact_strings=On/compact_strings=Off/ /etc/php/7.2/mods-available/igbinary.ini && \
+        echo 'mysqli.allow_local_infile=Off' >> /etc/php/7.2/mods-available/mysqli.ini && \
+        mkdir -p /var/log/php && chown www-data:www-data /var/log/php
+
+COPY phpfpm/conf/php_cli.ini /etc/php/7.2/cli/php.ini
+COPY phpfpm/conf/php.ini phpfpm/conf/php-fpm.conf /etc/php/7.2/fpm/
+COPY phpfpm/conf/pool.d/ /etc/php/7.2/fpm/pool.d/
 
 RUN /usr/bin/python3 /root/setup_image.py --stage base --type phpfpm
 

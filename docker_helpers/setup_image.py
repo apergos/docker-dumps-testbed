@@ -352,20 +352,22 @@ class Httpd():
         set up html files (index.html, error pages) for httpd server
         '''
         # make the docroots and copy in the html files
-        os.makedirs('/srv/mediawiki/docroot/default', exist_ok=True)
-        os.makedirs('/srv/app', exist_ok=True)
-        # make sure the web server can access files in there
-        os.chmod('/srv/mediawiki/docroot/default', stat.S_IXOTH)
-        os.chmod('/srv/app', stat.S_IXOTH)
+        # and make sure the web server can access files in there
+
+        # one-off index.html, 404.php etc
+        os.makedirs('/srv/mediawiki/dumptest', exist_ok=True)
+        os.chmod('/srv/mediawiki/dumptest', 0o755)
+
+        # document root is subdir of this, this will be mounted volume
+        os.makedirs('/srv/mediawiki/wikifarm', exist_ok=True)
+        os.chmod('/srv/mediawiki/wikifarm', 0o755)
 
         htmlfiles = glob.glob('/root/html/*')
         for htmlfile in htmlfiles:
-            shutil.copy(htmlfile, '/srv/mediawiki/docroot/default/')
-            shutil.copy(htmlfile, '/srv/app/')
+            shutil.copy(htmlfile, '/srv/mediawiki/dumptest/')
             htmlfile_basename = os.path.basename(htmlfile)
             os.chmod(os.path.join(
-                '/srv/mediawiki/docroot/default/', htmlfile_basename), stat.S_IROTH)
-            os.chmod(os.path.join('/srv/app/', htmlfile_basename), stat.S_IROTH)
+                '/srv/mediawiki/dumptest', htmlfile_basename), 0o644)
 
 
 class BaseImage():
