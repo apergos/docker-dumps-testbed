@@ -4,3 +4,4 @@ container_list.*
 **/temp/
 credentials*yaml
 *.sql.gz
+apergos.conf

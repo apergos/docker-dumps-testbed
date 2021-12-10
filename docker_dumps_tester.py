@@ -154,30 +154,6 @@ class ContainerConfig():
         self.verbose = verbose
         self.config = self.get_config(configpath)
 
-    @staticmethod
-    def merge_in_defaults(values, defaults, key):
-        '''
-        given a dictionary which may or may not hav the specified key in it,
-        which may be empty or have a string or another dict, merge in the entry
-        for the defaults dict with that key, which also may be nested dicts, and
-        return the result.
-        '''
-        merged = {}
-
-        if key not in values or not values[key]:
-            return defaults[key]
-
-        try:
-            _unused = defaults[key].items()
-        except AttributeError:
-            # we're at the bottom turtle.
-            return defaults[key]
-
-        for subkey in defaults[key]:
-            merged[subkey] = ContainerConfig.merge_in_defaults(values[key], defaults[key], subkey)
-
-        return merged
-
     def get_config(self, configfilepath):
         '''
         read and return the config settings from the specified
@@ -185,28 +161,32 @@ class ContainerConfig():
         '''
         values = {}
 
+        default_configfilepath = os.path.join(os.getcwd(), 'default.conf')
+        with open(default_configfilepath, "r") as fhandle:
+            contents = fhandle.read()
+            defaults = yaml.safe_load(contents)
+
         if configfilepath:
             try:
                 with open(configfilepath, "r") as fhandle:
                     contents = fhandle.read()
                     values = yaml.safe_load(contents)
             except (FileNotFoundError, PermissionError):
-                pass
+                print("Missing or bad permissions for config file", configfilepath, "Giving up")
+                raise
 
-        configfilepath = os.path.join(os.getcwd(), 'default.conf')
-        with open(configfilepath, "r") as fhandle:
-            contents = fhandle.read()
-            defaults = yaml.safe_load(contents)
-
-        if not values:
-            values = defaults
-
+        # missing or empty sets in the user defined config
+        # are filled in with the default config sets;
+        # it is not permitted to configure no sets at all.
         if 'sets' not in values or not values['sets']:
             values['sets'] = defaults['sets']
 
-        for setname in values['sets']:
-            values['sets'][setname]['passwords'] = self.merge_in_defaults(
-                values['sets'][setname], defaults['global'], 'passwords')
+        # missing globals in the user defined config are filled
+        # in with the default globals; an empty globals stanza in
+        # the user-defined config is left as is, so that there is
+        # a way for the user to not have global values.
+        if 'global' not in values:
+            values['global'] = defaults['global']
 
         if self.verbose:
             print("configuration:", values)
@@ -275,34 +255,72 @@ class ContainerConfig():
         '''
         print("Known sets:", ', '.join(list(self.config['sets'].keys())))
 
+    @staticmethod
+    def retrieve_value(config, key_names):
+        '''
+        given a a configuration in the form of a nested dict, and a
+        list of the names of the keys and subkeys in order,
+        return the value if there is such an entry, or None otherwise
+        '''
+        if not config:
+            return None
+        subtree = config
+        for kname in key_names:
+            if kname not in subtree:
+                return None
+            subtree = subtree[kname]
+        # typically this will be a plain value and not a tree but we
+        # don't care
+        return subtree
+
     def write_creds_file(self, setname, path):
         '''
         write a yaml file to the specified output path consisting of
         various credentials for users on the containers in the set
         as well as the list of dbs on which the db creds will be good
 
-        we know that the default password settings have already been
-        marged into the set configs in the constructor, so we don't have
-        to worry about that.
+        we know that defaults have already been filled in where appropriate
+        in the constructor, so we don't have to worry about that.
+
+        we fall back to users defined in the global stanza if a user-provided
+        config for a set has no users and either has global users defined or has
+        no globals stanza at all, in which case we will have those filled in from
+        the default cnofig.
 
         if there is no such set we silently return. hrm.
         '''
         set_config = self.get_containerset_config(setname)
         if not set_config:
             return
+        globals_config = self.config['global']
 
         contents = []
-        root_password = set_config['passwords']['containers']['root']
+        root_password = self.retrieve_value(set_config, ['passwords', 'containers', 'root'])
+        if not root_password:
+            root_password = self.retrieve_value(globals_config, ['passwords', 'containers', 'root'])
+        if not root_password:
+            print("A root password for containers must be specified in your configuration")
+            sys.exit(1)
         contents.append("rootuser: " + root_password)
 
-        rootdbuser_password = set_config['passwords']['dbs']['root']
+        rootdbuser_password = self.retrieve_value(set_config, ['passwords', 'dbs', 'root'])
+        if not rootdbuser_password:
+            rootdbuser_password = self.retrieve_value(globals_config, ['passwords', 'dbs', 'root'])
+        if not rootdbuser_password:
+            print("A root password for the db must be specified in your configuration")
+            sys.exit(1)
         contents.append("rootdbuser: " + rootdbuser_password)
 
-        wikidbuser_password = set_config['passwords']['dbs']['wikidb_user']
-        contents.append("wikidbuser: " + wikidbuser_password)
+        contents.append("wikidbusers:")
+        for dbuser_name in set_config['passwords']['dbs']:
+            if dbuser_name == 'root':
+                continue
 
-        wikidbadmin_password = set_config['passwords']['dbs']['wikidb_admin']
-        contents.append("wikidbadmin: " + wikidbadmin_password)
+            dbuser_password = self.retrieve_value(set_config, ['passwords', 'dbs', dbuser_name])
+            if not dbuser_password:
+                print("If a db user is specified in your config, it must have a password.")
+                sys.exit(1)
+            contents.append("  - " + dbuser_name + ": " + dbuser_password)
 
         contents.append("wikis:")
         for wiki in set_config['wikidbs']:
@@ -327,7 +345,7 @@ class Images():
     def image_exists(self, tag):
         '''check if the image with the specific tag in the container set exists'''
         client = DockerClient(base_url='unix://var/run/docker.sock')
-        entries = client.images.list('all')
+        entries = client.images.list(all=True)
         for entry in entries:
             if self.labeler.has_blame_label(entry) and tag in entry.tags:
                 return True
@@ -446,6 +464,14 @@ class Images():
             todos = [self.args['name']]
         do_squash = self.config.config['squash']
         for image_name in todos:
+
+            # If there are no import files set up, we'll make a placeholder so the image and
+            # container will be built, but we will warn the user as well.
+            db_imports_dir = os.path.join("./docker_helpers/mariadb/imports", self.args['set'])
+            if image_name == "dbprimary" and not os.path.exists(db_imports_dir):
+                os.makedirs(db_imports_dir)
+                print("WARNING: No imports for primary db for set", self.args['set'])
+
             final_image = 'wikimedia-dumps/{name}-{setname}-final:latest'.format(
                 name=image_name, setname=self.args['set'])
             if self.config.container_configured(image_name, self.args['set']):
@@ -495,14 +521,16 @@ class Images():
         if self.args['name']:
             if self.verbose:
                 print("removing specified base image for all sets.")
-            todos = ['wikimedia-dumps/{name}-base:latest'.format(name=self.args['name'])]
+            base_image = 'wikimedia-dumps/{name}-base:latest'.format(name=self.args['name'])
+            if self.image_exists(base_image):
+                todos = [base_image]
+            else:
+                todos = []
         else:
             if self.verbose:
                 print("removing all base images for all sets.")
 
             networks = self.nets.get_all_networks()
-
-            client = DockerClient(base_url='unix://var/run/docker.sock')
             for network in networks:
                 self.do_remove(network)
 
@@ -510,13 +538,36 @@ class Images():
             for image_name in ['snapshot', 'dbprimary', 'dbpreplica', 'dumpsdata',
                                'httpd', 'phpfpm']:
                 base_image = 'wikimedia-dumps/{name}-base:latest'.format(name=image_name)
-                todos.append(base_image)
+                if self.image_exists(base_image):
+                    todos.append(base_image)
 
+        if not todos:
+            print("no base images to remove")
+
+        client = DockerClient(base_url='unix://var/run/docker.sock')
         for base_image in todos:
-            if self.image_exists(base_image):
-                if self.verbose:
-                    print("removing {name} image".format(name=base_image))
-                client.images.remove(base_image)
+            if self.verbose:
+                print("removing {name} image".format(name=base_image))
+            client.images.remove(base_image)
+
+    def do_purgeall(self):
+        '''
+        purge the base image underlying all base images, first destroying all derived
+        containers for all sets, and all derived base and final images for all sets,
+        and all networks for all sets.
+        If image does not exist, just return
+        '''
+        if self.verbose:
+            print("removing base image for all images for all sets.")
+
+        base_image = "wikimedia-dumps/base:latest"
+        if self.image_exists(base_image):
+            if self.verbose:
+                print("removing {name} image".format(name=base_image))
+            client = DockerClient(base_url='unix://var/run/docker.sock')
+            client.images.remove(base_image)
+        else:
+            print("no base image to remove")
 
     def do_remove(self, network=None):
         '''
@@ -534,13 +585,15 @@ class Images():
         if self.args['name']:
             # remove just this image
             names = [self.args['name']]
-            message = "specified final image for this container set"
+            message = "specified final image for this container set " + self.args['set']
         else:
             # remove all the final images for the set
             names = ['snapshot', 'dbprimary', 'dbreplica', 'dumpsdata', 'httpd', 'phpfpm']
-            message = "all final images for this container set"
+            message = "all final images for this container set " + self.args['set']
             self.nets.remove_network(network=network)
 
+        if network is not None:
+            message = message + " and network name " + network.name
         if self.verbose:
             print("removing " + message)
 
@@ -548,13 +601,22 @@ class Images():
         for image_name in names:
             final_image = 'wikimedia-dumps/{name}-{setname}-final:latest'.format(
                 name=image_name, setname=self.args['set'])
-            full_image_names.append(final_image)
+            if self.image_exists(final_image):
+                full_image_names.append(final_image)
+
+        if not full_image_names:
+            message = "no final images to remove for set " + self.args['set']
+            if network is not None:
+                message = message + " and network name " + network.name
+            print(message)
 
         for image_name in full_image_names:
-            if self.image_exists(image_name):
-                if self.verbose:
-                    print("removing {name} image".format(name=image_name))
-                client.images.remove(image_name)
+            if self.verbose:
+                message = "removing {name} image".format(name=image_name)
+                if network is not None:
+                    message = message + " and network name " + network.name
+                print(message)
+            client.images.remove(image_name)
 
     def image_in_set(self, entry):
         '''check if an image is a final image in our set'''
@@ -579,7 +641,7 @@ class Images():
         client = DockerClient(base_url='unix://var/run/docker.sock')
 
         displayed = False
-        entries = client.images.list('all')
+        entries = client.images.list(all=True)
         for entry in entries:
             if self.labeler.has_blame_label(entry):
                 if show_all or self.image_in_set(entry) or self.image_is_base(entry):
@@ -615,7 +677,7 @@ class Containers():
         list all of the containers belonging to the specified set
         '''
         client = DockerClient(base_url='unix://var/run/docker.sock')
-        entries = client.containers.list('all')
+        entries = client.containers.list(all=True)
         displayed = False
         padding = max([len(entry.name) for entry in entries])
         for entry in entries:
@@ -633,7 +695,7 @@ class Containers():
         '''return short ids of the containers for the given set'''
         containers = []
         client = DockerClient(base_url='unix://var/run/docker.sock')
-        entries = client.containers.list('all')
+        entries = client.containers.list(all=True)
         if labels:
             for entry in entries:
                 if self.labeler.has_labels(entry.labels, labels):
@@ -648,7 +710,7 @@ class Containers():
     def container_exists(self, short_id):
         '''check if the container with the specified id from a container set exists'''
         client = DockerClient(base_url='unix://var/run/docker.sock')
-        entries = client.containers.list('all')
+        entries = client.containers.list(all=True)
         for entry in entries:
             if self.labeler.has_labels(entry.labels, self.labeler.get_set_label()):
                 if entry.short_id == short_id:
@@ -659,7 +721,7 @@ class Containers():
         '''check if the container with the specified name from a container set exists'''
         if not containers_known:
             client = DockerClient(base_url='unix://var/run/docker.sock')
-            containers_known = client.containers.list('all')
+            containers_known = client.containers.list(all=True)
         for entry in containers_known:
             if self.labeler.has_labels(entry.labels, self.labeler.get_set_label()):
                 if entry.name == name:
@@ -671,7 +733,7 @@ class Containers():
         container_ids = []
         if not containers_known:
             client = DockerClient(base_url='unix://var/run/docker.sock')
-            containers_known = client.containers.list('all')
+            containers_known = client.containers.list(all=True)
         for entry in containers_known:
             if self.labeler.has_labels(entry.labels, self.labeler.get_set_label()):
                 # allow for names like <setname>-snapshot-nn
@@ -753,7 +815,7 @@ class Containers():
         self.nets.create_network()
 
         client = DockerClient(base_url='unix://var/run/docker.sock')
-        containers_known = client.containers.list('all')
+        containers_known = client.containers.list(all=True)
 
         if self.args['name']:
             todos = [self.args['name']]
@@ -764,6 +826,11 @@ class Containers():
 
         # snapshot containers
         if 'snapshot' in todos:
+            wikifarm_volume = config['volumes']['wikifarm']
+            dumps_volume = config['volumes']['dumpsrepo']
+            volumes = {wikifarm_volume: {'bind': '/srv/mediawiki/wikifarm', 'mode': 'rw'},
+                       dumps_volume: {'bind': '/srv/dumps', 'mode': 'rw'}}
+
             self.check_and_create({'config': 'snapshots', 'max': 99,
                                    'basename': 'snapshot', 'image': 'snapshot'},
                                   client, containers_known)
@@ -828,7 +895,7 @@ class Containers():
             message = "all containers for all container sets"
         elif self.args['name']:
             # specified container
-            containers_known = client.containers.list('all')
+            containers_known = client.containers.list(all=True)
             container_ids = self.get_container_ids_from_name(self.args['name'], containers_known)
             message = "the specified container in this set "
         else:
@@ -866,7 +933,7 @@ class Containers():
         self.do_create()
 
         client = DockerClient(base_url='unix://var/run/docker.sock')
-        containers_known = client.containers.list('all')
+        containers_known = client.containers.list(all=True)
 
         if self.args['name']:
             container_ids = self.get_container_ids_from_name(self.args['name'], containers_known)
@@ -889,7 +956,7 @@ class Containers():
         If the containers do not exist for this set, just return
         '''
         client = DockerClient(base_url='unix://var/run/docker.sock')
-        containers_known = client.containers.list('all')
+        containers_known = client.containers.list(all=True)
         if self.args['name']:
             container_ids = self.get_container_ids_from_name(self.args['name'], containers_known)
         else:
@@ -961,6 +1028,13 @@ class WikifarmSets():
             # must also be destroyed
             self.containers.do_destroy(do_all=True)
             self.images.do_purge()
+        elif self.args['command'] == 'purgeall':
+            # we are removing the base image for all the base images for the wiki set,
+            # so everything must be removed for all sets
+            # must also be destroyed
+            self.containers.do_destroy(do_all=True)
+            self.images.do_purge()
+            self.images.do_purgeall()
 
 
 class DumpsTestbedOpts():
@@ -1001,31 +1075,34 @@ and 'docker ls -a' to see the list of images or containers, and the commands
 
 Arguments:
 
- --base    (-B):  build base images needed for containers for the specified container set
- --build   (-b):  build final images needed for containers for the specified container set
-                  also do the base build if needed
- --create  (-c):  create containers in the specified container set for sql/xml dump tests
-                  also do the base and final image builds if needed
- --start   (-s):  start up the containers for the wikifarm in the specified set
-                  also do container creation if needed
- --name    (-n):  build or remove the specified base or final image, where 'name' is one of
-                  the image or container types in the set ('snapshot', 'httpd', 'dumpsdata' (nfs),
-                  'dbextstore', 'dbreplica', 'phpfpm', 'dbprimary'), or create, start, destroy
-                  or stop the specified container(s) in the set
-                  this option is valid with --base, --build, --remove, --purge, --create, --start,
-                  --destroy or --stop and will be ignored in all other cases
- --list    (-l):  list containers created for the wikifarm in the specified set
- --stop    (-S):  stop the containers for the wikifarm in the specified set
- --destroy (-d):  destroy the containers in the specified set
- --remove  (-r):  remove the final images for the containers in the specified set
-                  all running containers for this set will be stopped and destroyed first
- --purge   (-p):  purge the base images for the containers in the specified set
-                  all running containers for this set will be stopped and destroyed first
-                  and all final images for this set will also be removed
- --test    (-t):  run the specified test as defined in the specified set
- --config  (-C):  path to configuration file. settings in this file will override
-                  settings in default.conf
-                  default value: './docker-dumps.conf' in the current working directory
+ --base     (-B):  build base images needed for containers for the specified container set
+ --build    (-b):  build final images needed for containers for the specified container set
+                   also do the base build if needed
+ --create   (-c):  create containers in the specified container set for sql/xml dump tests
+                   also do the base and final image builds if needed
+ --start    (-s):  start up the containers for the wikifarm in the specified set
+                   also do container creation if needed
+ --name     (-n):  build or remove the specified base or final image, where 'name' is one of
+                   the image or container types in the set ('snapshot', 'httpd', 'dumpsdata' (nfs),
+                   'dbextstore', 'dbreplica', 'phpfpm', 'dbprimary'), or create, start, destroy
+                   or stop the specified container(s) in the set
+                   this option is valid with --base, --build, --remove, --purge, --create, --start,
+                   --destroy or --stop and will be ignored in all other cases
+ --list     (-l):  list containers created for the wikifarm in the specified set
+ --stop     (-S):  stop the containers for the wikifarm in the specified set
+ --destroy  (-d):  destroy the containers in the specified set
+ --remove   (-r):  remove the final images for the containers in the specified set
+                   all running containers for this set will be stopped and destroyed first
+ --purge    (-p):  purge the base images for the containers in the specified set
+                   all running containers for this set will be stopped and destroyed first
+                   and all final images for this set will also be removed
+ --purgeall (-P):  purge the base image for all base images, final images, etc
+                   all running containers for this set will be stopped and destroyed first
+                   and all base and final images for this set will also be removed
+ --test     (-t):  run the specified test as defined in the specified set
+ --config   (-C):  path to configuration file. settings in this file will override
+                   settings in default.conf
+                   default value: './docker-dumps.conf' in the current working directory
 
 Flags:
 
@@ -1043,7 +1120,7 @@ Flags:
         set: a collection of containers defined in the config for one wikifarm
         test: a name for a specific test defined in the config and associated with a wikifarm
         '''
-        args = {'configfile': None, 'set': None, 'test': None,
+        args = {'config': None, 'set': None, 'test': None,
                 'name': None, 'verbose': False, 'dryrun': False}
         return args
 
@@ -1055,7 +1132,7 @@ Flags:
         # to handle. the caller, for example, may decide to show all known sets to the user.
         if 'command' in args and not args['command']:
             self.usage("One of the args 'base', 'build', 'create', 'list', 'start', 'stop', "
-                       "'test', 'remove' or 'destroy' must be specified")
+                       "'test', 'remove', 'destroy', 'purge' or 'purgeall'  must be specified")
         if args['name'] and args['name'] not in ['snapshot', 'httpd', 'dumpsdata', 'dbextstore',
                                                  'dbreplica', 'phpfpm', 'dbprimary']:
             self.usage("Unknown container type " + args['name'] + " specified.")
@@ -1066,12 +1143,13 @@ Flags:
         where needed, whining about bad args
         '''
         commands = {'B': 'base', 'b:': 'build', 'c': 'create', 'l': 'list', 's': 'start',
-                    'S': 'stop', 'd': 'destroy', 'r': 'remove', 'p': 'purge'}
+                    'S': 'stop', 'd': 'destroy', 'r': 'remove', 'p': 'purge', 'P': 'purgeall'}
         try:
             (options, remainder) = getopt.gnu_getopt(
-                sys.argv[1:], "C:t:b:B:c:l:s:S:n:d:r:Dvh",
+                sys.argv[1:], "C:t:b:B:c:l:s:S:n:d:r:p:P:Dvh",
                 ["config=", "test=", "base=", "build=", "create=", "name=", "list=", "start=",
-                 "stop=", "destroy=", "remove=", "purge=", "dryrun", "verbose", "help"])
+                 "stop=", "destroy=", "remove=", "purge=", "purgeall=",
+                 "dryrun", "verbose", "help"])
 
         except getopt.GetoptError as err:
             self.usage("Unknown option specified: " + str(err))
@@ -1112,7 +1190,7 @@ def do_main():
     '''entry point'''
     opts = DumpsTestbedOpts()
     args = opts.process_opts()
-    config = ContainerConfig(args['configfile'], args['verbose'])
+    config = ContainerConfig(args['config'], args['verbose'])
     labeler = ContainerLabels(args)
     networks = Networks(args, labeler)
     images = Images(args, config, labeler, networks)

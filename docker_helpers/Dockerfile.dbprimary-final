@@ -6,15 +6,21 @@ ARG SETNAME
 
 # we want the file with all the container names for the set; these will
 # be embedded in various files in the image
-COPY ["mariadb/substitution.conf", "container_list.$SETNAME", "credentials.$SETNAME.yaml", "/root/"]
-RUN mkdir -p /root/imports
+COPY ["mariadb/substitution.conf", "container_list.$SETNAME", "credentials.$SETNAME.yaml", "setup_image.py", "/root/"]
+
+# it would be nicer to do this during the base build stage but if we want the script to be embedded in
+# the image only when we get to the final build, it has to be run here.
+# we start up the server, secure it somewhat, set up root password, shut it down again
+
+RUN /usr/bin/python3 /root/setup_image.py --stage base --type dbprimary
 
 # import all the wikis!
+RUN mkdir -p /root/imports
 COPY ["mariadb/imports/$SETNAME", "/root/imports"]
 RUN python3 /root/setup_image.py --stage final --type dbprimary --set "$SETNAME"
 
 RUN mkdir -p "/etc/motd.d/"
-RUN echo -e "\nThis is a mariadb primary server instance.\n" > /etc/motd.d/containerinfo
+RUN bash -c 'echo -e "\nThis is a mariadb primary server instance.\n" > /etc/motd.d/containerinfo'
 
 # ports for sshd, mariadb
 EXPOSE 22 3306

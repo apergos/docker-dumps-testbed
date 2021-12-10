@@ -5,11 +5,14 @@ ARG SETNAME
 
 # we want the file with all the container names for the set; these will
 # be embedded in various files in the image
-COPY ["snapshot/substitution.conf", "container_list.$SETNAME", "credentials.$SETNAME.yaml", "/root/"]
+COPY ["snapshot/substitution.conf", "container_list.$SETNAME", "credentials.$SETNAME.yaml", "setup_image.py", "/root/"]
+
+RUN /usr/bin/python3 /root/setup_image.py --stage base --type snapshot
+
 RUN python3 /root/setup_image.py --stage final --type snapshot --set "$SETNAME"
 
 RUN mkdir -p "/etc/motd.d/"
-RUN echo -e "\nThis is an SQL/XML dumps snapshot instance.\n" > /etc/motd.d/containerinfo
+RUN bash -c 'echo -e "\nThis is an SQL/XML dumps snapshot instance.\n" > /etc/motd.d/containerinfo'
 
 EXPOSE 22
 CMD /usr/sbin/sshd -D

@@ -370,6 +370,32 @@ class Httpd():
                 '/srv/mediawiki/dumptest', htmlfile_basename), 0o644)
 
 
+class PHPfpm():
+    '''manage php-fpm image setup'''
+
+    @staticmethod
+    def setup_php():
+        '''
+        set up php files (hello.php etc) for php-fpm
+        '''
+        # make the docroots and copy in the php files
+        # and make sure the php-fpm server can access files in there
+
+        os.makedirs('/srv/mediawiki/dumptest', exist_ok=True)
+        os.chmod('/srv/mediawiki/dumptest', 0o755)
+
+        # document root is subdir of this, this will be mounted volume
+        os.makedirs('/srv/mediawiki/wikifarm', exist_ok=True)
+        os.chmod('/srv/mediawiki/wikifarm', 0o755)
+
+        phpfiles = glob.glob('/root/html/*php')
+        for phpfile in phpfiles:
+            shutil.copy(phpfile, '/srv/mediawiki/dumptest/')
+            phpfile_basename = os.path.basename(phpfile)
+            os.chmod(os.path.join(
+                '/srv/mediawiki/dumptest', phpfile_basename), 0o644)
+
+
 class BaseImage():
     '''
     manage setup of the base image for any image type
@@ -399,7 +425,7 @@ class BaseImage():
             Httpd.setup_html()
 
         elif self.itype == 'phpfpm':
-            # fixme TO BE DONE
+            PHPfpm.setup_php()
             return
 
         elif self.itype == 'snapshot':
@@ -440,15 +466,15 @@ class Credentials():
                     error = result.stderr
                 print("failed to set container root creds (", error, ")")
 
-    def setup_db_user(self, dbuser, wiki, mdb):
+    def setup_db_user(self, dbuser, password, wiki, mdb):
         '''
         create a user and add the appropriate grants for access to a wiki db
         '''
         command = "CREATE USER '{dbuser}'@'%' IDENTIFIED BY '{passwd}';".format(
-            dbuser=dbuser, passwd=self.creds[dbuser])
+            dbuser=dbuser, passwd=password)
         mdb.do_query(command, self.creds['rootdbuser'])
         command = "GRANT USAGE ON *.* TO `{dbuser}`@`%` IDENTIFIED BY '{passwd}';".format(
-            dbuser=dbuser, passwd=self.creds[dbuser])
+            dbuser=dbuser, passwd=password)
         mdb.do_query(command, self.creds['rootdbuser'])
         command = ("GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, REFERENCES, INDEX, " +
                    "ALTER, CREATE TEMPORARY TABLES, LOCK TABLES, EXECUTE, CREATE VIEW, " +
@@ -469,13 +495,19 @@ class Credentials():
         proc = mdb.start_server(password, config_overrides=config_overrides)
         mdb.set_root_password(self.creds['rootdbuser'], password)
 
-        # set up wikidb users for every wikidb we're going to have in the set.
+        # set up wikidb users which will have access to every wikidb we're going to have in the set.
         for wiki in self.creds['wikis']:
             mdb.do_query("CREATE DATABASE IF NOT EXISTS " + wiki,
                          self.creds['rootdbuser'])
 
-            self.setup_db_user('wikidbuser', wiki, mdb)
-            self.setup_db_user('wikidbadmin', wiki, mdb)
+            for dbuser_entry in self.creds['wikidbusers']:
+                # dbuser_entry is {username: password}
+                if len(dbuser_entry) != 1:
+                    print("Bad db user entry in config file", dbuser_entry)
+                    # fixme this ought to be an exception I guess, meh
+                    sys.exit(1)
+                self.setup_db_user(list(dbuser_entry.keys())[0],
+                                   list(dbuser_entry.values())[0], wiki, mdb)
 
         mdb.stop_server(self.creds['rootdbuser'], proc=proc)
 

@@ -22,7 +22,7 @@ class MariaDBTest(unittest.TestCase):
     @staticmethod
     def get_datadir():
         return os.path.join(os.getcwd(), MariaDBTest.MYSQLTESTDIR, "mysqldata")
-        
+
     @staticmethod
     def get_logfile():
         return os.path.join(os.getcwd(), MariaDBTest.MYSQLTESTDIR, "mysqld.log")
@@ -148,43 +148,72 @@ class MariaDBTest(unittest.TestCase):
         mdb.stop_server(proc=proc)
 
 
-class MergeInDefaultsTest(unittest.TestCase):
+class CredentialsTest(unittest.TestCase):
     '''
-    test merging of one dict (like default config
-    settings) into another dict (like user-specified
-    config settings)
+    test creation of a credentials file, including proper munging of configurations
     '''
-    def test_merge_missing_settings(self):
-        '''test that we can merge one dict of some settings
-        into another'''
-        default_content = {'global': {'passwords': {
-            'dbs': {'wikidb_user': 'wikidbuser_defaultset',
-                    'wikidb_admin': 'wikidbadmin_defaultset',
-                    'root': 'notverysecure'},
-            'containers': {'root': 'testing'}
-        }}}
-        # entire password section missing
-        user_provided_content = {'global': {'other_junk': 'stuff'}}
-        merged = docker_dumps_tester.ContainerConfig.merge_in_defaults(
-            user_provided_content['global'], default_content['global'], 'passwords')
-        self.assertEqual(merged, default_content['global']['passwords'])
+    CONFIGTESTDIR = "dump_test_temp"
 
-        # db section missing
-        user_provided_content = {'global': {'passwords': {
-            'containers': {'root': 'testing'}
-        }}}
-        merged = docker_dumps_tester.ContainerConfig.merge_in_defaults(
-            user_provided_content['global'], default_content['global'], 'passwords')
+    @staticmethod
+    def get_credfilepath():
+        return os.path.join(os.getcwd(), CredentialsTest.CONFIGTESTDIR, "test_creds_file")
 
-        # wikidb_admin setting missing
-        merged = docker_dumps_tester.ContainerConfig.merge_in_defaults(
-            user_provided_content['global'], default_content['global'], 'passwords')
-        user_provided_content = {'global': {'passwords': {
-            'dbs': {'wikidb_user': 'wikidbuser_defaultset',
-                    'root': 'notverysecure'},
-            'containers': {'root': 'testing'}
-        }}}
-        self.assertEqual(merged, default_content['global']['passwords'])
+    def test_container_config(self):
+        '''
+        get the configuration with globals and/or sets read from a user-defined config,
+        as appropriate
+        '''
+        config = docker_dumps_tester.ContainerConfig("test_files/atg.conf", False)
+        expected_config = {'global':
+                           {'passwords':
+                            {'dbs': {'root': 'notverysecure'},
+                             'containers': {'root': 'testing'}}},
+                           'sets':
+                           {'atg':
+                            {'snapshots': 1, 'dbprimary': True, 'dbreplicas': 0,
+                             'dbextstore': False, 'httpd': True, 'phpfpm': True,
+                             'dumpsdata': False, 'wikidbs': ['elwikivoyage'],
+                             'passwords':
+                             {'dbs': {'elwv_user': 'elwv_hahaha', 'root': 'notverysecure'},
+                              'containers': {'root': 'testing'}},
+                             'volumes':
+                             {'wikifarm': '/var/www/html/wikifarm',
+                              'dumpsrepo': '/home/ariel/wmf/dumps/testing/dumps'}}},
+                           'tests': {'defaultset': 'wikidata_batch_test'},
+                           'squash': False,
+                           'prune': False}
+        self.assertEqual(config.config, expected_config)
+
+    def test_write_creds_file(self):
+        '''
+        get the configuration and write a credentials file from it
+        '''
+        config = docker_dumps_tester.ContainerConfig("test_files/atg.conf", False)
+        config.write_creds_file("atg", self.get_credfilepath())
+        with open(self.get_credfilepath(), "r") as fhandle:
+            contents = fhandle.read()
+        expected_contents = """rootuser: testing
+rootdbuser: notverysecure
+wikidbusers:
+  - elwv_user: elwv_hahaha
+wikis:
+  - elwikivoyage
+"""
+        self.assertEqual(contents, expected_contents)
+
+    def setUp(self):
+        '''create the temp file directory, removing it and any junk in it first
+        if needed'''
+        tempfilesdir = os.path.join(os.getcwd(), CredentialsTest.CONFIGTESTDIR)
+        if os.path.exists(tempfilesdir):
+            shutil.rmtree(tempfilesdir)
+        os.makedirs(tempfilesdir)
+        
+    def tearDown(self):
+        '''remove the temp file directory and its contents'''
+        tempfilesdir = os.path.join(os.getcwd(), CredentialsTest.CONFIGTESTDIR)
+        if os.path.exists(tempfilesdir):
+            shutil.rmtree(tempfilesdir)
 
 
 if __name__ == '__main__':

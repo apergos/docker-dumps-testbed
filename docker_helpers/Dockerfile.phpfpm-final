@@ -5,11 +5,16 @@ ARG SETNAME
 
 # we want the file with all the container names for the set; these will
 # be embedded in various files in the image
-COPY ["phpfpm/substitution.conf", "container_list.$SETNAME", "credentials.$SETNAME.yaml", "/root/"]
+COPY ["phpfpm/substitution.conf", "container_list.$SETNAME", "credentials.$SETNAME.yaml", "setup_image.py", "/root/"]
+RUN mkdir /root/html
+COPY "httpd/html/*php" "/root/html/"
+
+RUN /usr/bin/python3 /root/setup_image.py --stage base --type phpfpm
+
 RUN python3 /root/setup_image.py --stage final --type phpfpm --set "$SETNAME"
 
 RUN mkdir -p "/etc/motd.d/"
-RUN echo -e "\nThis is a PHP-FPM instance.\n" > /etc/motd.d/containerinfo
+RUN bash -c 'echo -e "\nThis is a PHP-FPM instance.\n" > /etc/motd.d/containerinfo'
 
 RUN mkdir -p "/srv/mediawiki/wikifarm"
 VOLUME /srv/mediawiki/wikifarm

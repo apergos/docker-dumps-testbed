@@ -13,15 +13,12 @@ COPY ["mariadb/scripts/setup-alternatives-links.sh", "/root/"]
 #  - make symlinks from /opt/wmf-mariadb104 to /usr/local/bin and from mysql names to mariadb
 #  - set up the mysql user
 #  - install system and other dbs normally done at initialization in the systemd unit
-#  - start up the server, secure it somewhat, set up root password, shut it down again (this last is in
-#    setup_image.py)
 RUN /bin/bash /root/setup-alternatives-links.sh && \
-    /usr/sbin/groupadd mysql && /usr/sbin/useradd -g mysql mysql && \
+    /usr/sbin/groupadd -g 499 mysql && /usr/sbin/useradd -g mysql mysql && \
     mkdir -p /srv/tmp /srv/sqldata /run/mysqld  && chown mysql:mysql /srv/tmp /srv/sqldata /run/mysqld && \
-    /opt/wmf-mariadb104/scripts/mysql_install_db -u mysql --datadir=/srv/sqldata --auth-root-authentication-method=normal && \
-    /usr/bin/python3 /root/setup_image.py --stage base --type dbprimary
+    /opt/wmf-mariadb104/scripts/mysql_install_db -u mysql --datadir=/srv/sqldata --auth-root-authentication-method=normal
 
-# ports for sshd, mariadb
-EXPOSE 22 3306
+# ports for sshd
+EXPOSE 22
 
-CMD /usr/dbin/sshd && /opt/wmf-mariadb104/bin/mysqld --basedir=/opt/wmf-mariadb104/
+CMD /usr/dbin/sshd -D

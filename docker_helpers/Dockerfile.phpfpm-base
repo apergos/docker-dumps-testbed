@@ -21,7 +21,5 @@ COPY phpfpm/conf/php_cli.ini /etc/php/7.2/cli/php.ini
 COPY phpfpm/conf/php.ini phpfpm/conf/php-fpm.conf /etc/php/7.2/fpm/
 COPY phpfpm/conf/pool.d/ /etc/php/7.2/fpm/pool.d/
 
-RUN /usr/bin/python3 /root/setup_image.py --stage base --type phpfpm
-
 EXPOSE 22
 CMD /usr/sbin/sshd -D

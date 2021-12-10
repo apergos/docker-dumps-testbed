@@ -7,7 +7,10 @@ ARG SETNAME
 
 # we want the file with all the container names for the set; these will
 # be embedded in various files in the image
-COPY ["httpd/substitution.conf", "container_list.$SETNAME", "credentials.$SETNAME.yaml", "/root/"]
+COPY ["httpd/substitution.conf", "container_list.$SETNAME", "credentials.$SETNAME.yaml", "setup_image.py", "/root/"]
+
+RUN /usr/bin/python3 /root/setup_image.py --stage base --type httpd
+
 RUN python3 /root/setup_image.py --stage final --type httpd --set "$SETNAME"
 
 ENV APACHE_RUN_USER=www-data APACHE_PID_FILE=/run/apache2/httpd.pid APACHE_RUN_DIR=/run/apache2 \
@@ -15,7 +18,7 @@ ENV APACHE_RUN_USER=www-data APACHE_PID_FILE=/run/apache2/httpd.pid APACHE_RUN_D
     APACHE_LOCK_DIR=/var/lock/apache2
 
 RUN mkdir -p "/etc/motd.d/"
-RUN echo -e "\nThis is a MediaWiki appserver instance.\n" > /etc/motd.d/containerinfo
+RUN bash -c 'echo -e "\nThis is a MediaWiki appserver instance.\n" > /etc/motd.d/containerinfo'
 
 RUN mkdir -p "/srv/mediawiki/wikifarm"
 VOLUME /srv/mediawiki/wikifarm
