@@ -1029,16 +1029,15 @@ class WikifarmSets():
             self.containers.do_destroy()
             self.images.do_remove()
         elif self.args['command'] == 'purge':
-            # we are removing all base images for the wiki set, but
-            # containers in the other sets depend on them too so they
-            # must also be destroyed
-            self.containers.do_destroy(do_all=True)
+            self.containers.do_destroy()
+            self.images.do_remove()
             self.images.do_purge()
         elif self.args['command'] == 'purgeall':
             # we are removing the base image for all the base images for the wiki set,
             # so everything must be removed for all sets
             # must also be destroyed
             self.containers.do_destroy(do_all=True)
+            self.images.do_remove()
             self.images.do_purge()
             self.images.do_purgeall()
 
