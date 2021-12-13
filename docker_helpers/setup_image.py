@@ -396,6 +396,31 @@ class PHPfpm():
                 '/srv/mediawiki/dumptest', phpfile_basename), 0o644)
 
 
+class Snapshot():
+    '''manage snapshot image setup'''
+
+    @staticmethod
+    def setup_volume_dirs():
+        '''
+        set up volumes for snapshot instances
+        '''
+        # mounted volume with mediawiki available for each wiki in the farm
+        os.makedirs('/srv/mediawiki/wikifarm', exist_ok=True)
+        os.chmod('/srv/mediawiki/wikifarm', 0o755)
+
+        # mounted volume with checkout of dumps python scripts repo
+        os.makedirs('/srv/dumps/dumpsrepo', exist_ok=True)
+        os.chmod('/srv/dumps/dumpsrepo', 0o755)
+
+        # mounted volume with all configuration, stage and dblists
+        os.makedirs('/srv/dumps/etc', exist_ok=True)
+        os.chmod('/srv/dumps/etc', 0o755)
+
+        # mounted volume with all dump output files
+        os.makedirs('/srv/dumps/runs', exist_ok=True)
+        os.chmod('/srv/dumps/runs', 0o755)
+
+
 class BaseImage():
     '''
     manage setup of the base image for any image type
@@ -429,7 +454,7 @@ class BaseImage():
             return
 
         elif self.itype == 'snapshot':
-            # fixme TO BE DONE
+            Snapshot.setup_volume_dirs()
             return
 
         elif self.itype == 'dbprimary':

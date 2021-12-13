@@ -14,5 +14,8 @@ RUN python3 /root/setup_image.py --stage final --type snapshot --set "$SETNAME"
 RUN mkdir -p "/etc/motd.d/"
 RUN bash -c 'echo -e "\nThis is an SQL/XML dumps snapshot instance.\n" > /etc/motd.d/containerinfo'
 
+RUN mkdir -p "/srv/mediawiki/wikifarm" && mkdir -p "/srv/dumps/dumpsrepo" && mkdir -p "/srv/dumps/etc" && mkdir -p "/srv/dumps/runs"
+VOLUME [ "/srv/mediawiki/wikifarm", "/srv/dumps/dumpsrepo", "/srv/dumps/etc", "/srv/dumps/runs" ]
+
 EXPOSE 22
 CMD /usr/sbin/sshd -D

@@ -827,13 +827,19 @@ class Containers():
         # snapshot containers
         if 'snapshot' in todos:
             wikifarm_volume = config['volumes']['wikifarm']
-            dumps_volume = config['volumes']['dumpsrepo']
-            volumes = {wikifarm_volume: {'bind': '/srv/mediawiki/wikifarm', 'mode': 'rw'},
-                       dumps_volume: {'bind': '/srv/dumps', 'mode': 'rw'}}
+            dumpsrepo_volume = config['volumes']['dumpsrepo']
+            dumpsetc_volume = config['volumes']['dumpsetc']
+            dumpsruns_volume = config['volumes']['dumpsruns']
+            volumes = {
+                wikifarm_volume: {'bind': '/srv/mediawiki/wikifarm', 'mode': 'rw'},
+                dumpsrepo_volume: {'bind': '/srv/dumps/dumpsrepo', 'mode': 'ro'},
+                dumpsetc_volume: {'bind': '/srv/dumps/etc', 'mode': 'ro'},
+                dumpsruns_volume: {'bind': '/srv/dumps/runs', 'mode': 'rw'}
+            }
 
             self.check_and_create({'config': 'snapshots', 'max': 99,
                                    'basename': 'snapshot', 'image': 'snapshot'},
-                                  client, containers_known)
+                                  client, containers_known, volumes)
 
         # mariadb primary server container
         if 'dbprimary' in todos:
