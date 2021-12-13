@@ -28,3 +28,11 @@ Provide the path to this directory as a value for the volumes:dumpsetc entry in
 the config for the given container set. This directory should be readable and
 writeable by the world or (preferrably) by the group with gid 489.
 
+## Dumps template files
+
+Some heml files and text templates are used during the dump run in order to
+generate html pages showing the status of a dump run for one or all wikis.
+These templates must be placed in a directory, preferably under the dumpsetc
+path someplace, and your dumps configuration file should include that path.
+Samples of such files are available in the dumps repo in xmldumps-backup/samples/
+and can be copied in and edited to suit your taste for testing.
